@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Duck RNG! V1.0</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', sans-serif;
+			text-align: center;
+			background: #0a0a0a;
+			color: white;
+			padding: 20px;
+			overflow-x: hidden;
+			margin: 0;
+		}
+
+		.currency {
+			font-size: 2rem;
+			color: #ffd700;
+			margin: 10px;
+			font-weight: bold;
+			position: relative;
+			z-index: 10;
+		}
+
+		.rarity-display {
+			font-size: 2.2rem;
+			font-weight: 900;
+			margin: 20px;
+			min-height: 180px;
+			line-height: 1.2;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			position: relative;
+			z-index: 10;
+		}
+
+		.game-grid {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 20px;
+			position: relative;
+			z-index: 10;
+		}
+
+		.panel {
+			background: rgba(21, 21, 21, 0.95);
+			padding: 20px;
+			border-radius: 15px;
+			border: 1px solid #333;
+			width: 100%;
+			max-width: 900px;
+			backdrop-filter: blur(10px);
+		}
+
+		.search-bar {
+			width: 100%;
+			padding: 12px;
+			margin-bottom: 10px;
+			background: #000;
+			border: 1px solid #444;
+			color: white;
+			border-radius: 5px;
+			outline: none;
+			box-sizing: border-box;
+		}
+
+		.inv-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+			gap: 10px;
+			margin-top: 5px;
+			max-height: 350px;
+			overflow-y: auto;
+			padding: 10px;
+			background: #000;
+			border-radius: 10px;
+		}
+
+		.inv-item {
+			background: #222;
+			padding: 10px;
+			border-radius: 8px;
+			border-left: 5px solid #444;
+			text-align: left;
+			position: relative;
+			font-size: 0.9rem;
+		}
+
+		.inv-count {
+			position: absolute;
+			right: 8px;
+			top: 8px;
+			background: #444;
+			padding: 2px 6px;
+			border-radius: 6px;
+			font-size: 0.75rem;
+			color: #00ffcc;
+		}
+
+		#aura-canvas {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+			z-index: 1;
+		}
+
+		.index-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+			gap: 8px;
+			margin-top: 15px;
+		}
+
+		.index-item {
+			background: #222;
+			padding: 8px;
+			border-radius: 5px;
+			font-size: 0.75rem;
+			border: 1px solid #444;
+			color: #444;
+			filter: grayscale(1);
+			opacity: 0.4;
+		}
+
+		.unlocked {
+			filter: grayscale(0) !important;
+			opacity: 1 !important;
+			border-color: #ffd700 !important;
+		}
+
+		.shop-item {
+			background: #222;
+			padding: 12px;
+			border-radius: 8px;
+			width: 150px;
+			border: 1px solid #444;
+			vertical-align: top;
+			display: inline-block;
+			margin: 5px;
+		}
+
+		.price {
+			color: #ffd700;
+			font-weight: bold;
+			display: block;
+			font-size: 0.9rem;
+			margin-bottom: 5px;
+		}
+
+		button {
+			padding: 10px;
+			cursor: pointer;
+			background: #333;
+			color: white;
+			border: 1px solid #555;
+			border-radius: 5px;
+			width: 100%;
+			font-weight: bold;
+		}
+
+		button:hover:not(:disabled) {
+			background: #444;
+			border-color: #ffd700;
+		}
+
+		button:disabled {
+			opacity: 0.3;
+			cursor: not-allowed;
+		}
+
+		.roll-btn {
+			font-size: 1.8rem;
+			padding: 15px 40px;
+			background: #222;
+			width: auto;
+			color: #00ffcc;
+			border: 2px solid #00ffcc;
+			margin-bottom: 5px;
+		}
+
+		.auto-btn {
+			font-size: 1.2rem;
+			padding: 15px 30px;
+			width: auto;
+			border: 2px solid #ff4444;
+			color: #ff4444;
+			margin-left: 10px;
+		}
+
+		.auto-active {
+			background: #ff4444;
+			color: white;
+		}
+
+		.stats-bar {
+			margin-top: 30px;
+			padding: 20px;
+			background: #111;
+			border-top: 1px solid #333;
+			color: #888;
+			position: relative;
+			z-index: 10;
+		}
+
+		#dev-controls {
+			display: none;
+			margin: 20px auto;
+			padding: 15px;
+			background: #221a00;
+			border: 1px solid #ffd700;
+			border-radius: 10px;
+			width: fit-content;
+		}
+
+		@keyframes quackShake {
+			0% {
+				transform: scale(1.1);
+			}
+
+			50% {
+				transform: scale(1.15) rotate(-2deg);
+			}
+
+			100% {
+				transform: scale(1.1);
+			}
+		}
+
+		@keyframes rainbow {
+			0% {
+				filter: hue-rotate(0deg);
+			}
+
+			100% {
+				filter: hue-rotate(360deg);
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<canvas id="aura-canvas"></canvas>
+	<div class="currency">🪙 <span id="coins">0</span></div>
+	<div id="display" class="rarity-display"><span id="rarity-label">Ready?</span></div>
+
+	<div id="dev-controls">
+		<strong style="color: #ffd700;">GOD MODE SLIDER</strong><br>
+		<input type="range" min="1" max="100" value="10" class="slider" id="dev-slider" oninput="updateDevLuck(this.value)">
+		<br><small id="slider-val">Mutation: 1 in 10</small>
+	</div>
+
+	<div style="margin-bottom: 20px;">
+		<button class="roll-btn" onclick="roll()">ROLL</button>
+		<button id="auto-toggle" class="auto-btn" onclick="toggleAuto()">AUTO: OFF</button>
+		<button onclick="saveGame()" style="width:auto; padding:15px; margin-left:10px; background:#222; border:1px solid #ffd700; color:#ffd700;">💾 SAVE</button>
+		<button id="exit-dev" style="display:none; width:auto; background:#444; border:1px solid red; color:red; margin-left:10px; padding:15px;" onclick="exitDev()">EXIT DEV MODE</button>
+	</div>
+
+	<div class="game-grid">
+		<div class="panel">
+			<h3 id="bag-title">Legit Backpack</h3>
+			<input type="text" id="inv-search" class="search-bar" placeholder="Search rolls..." oninput="updateInventoryUI()">
+			<div id="inventory-grid" class="inv-grid"></div>
+		</div>
+		<div class="panel">
+			<h3>Shop</h3>
+			<div id="shop-items"></div>
+		</div>
+		<div class="panel">
+			<h3>Index</h3>
+			<div id="rarity-index" class="index-grid"></div>
+			<hr style="border:0;border-top:1px solid #333;margin:15px 0;">
+			<div id="mutation-index" class="index-grid"></div>
+		</div>
+	</div>
+
+	<div class="stats-bar">
+		<p>Rolls: <span id="stat-rolls" style="color:#00ffcc">0</span> | Luck:
+			<span id="stat-luck" style="color:#00ffcc">1.0x</span> | Speed:
+			<span id="stat-speed" style="color:#00ffcc">1.0s</span></p>
+		<p>Rarest Roll: <span id="rarest-best" style="color:gold; font-weight:bold;">None</span></p>
+		<input type="password" id="dev-box" style="background:#000;border:1px solid #333;color:#444;padding:5px;font-size:0.7rem;" placeholder="Key..." oninput="checkDev(this.value)">
+		<br><button onclick="hardReset()" style="width:auto; margin-top:20px; font-size:0.7rem; color:#555; background:transparent; border:none; cursor:pointer;">Hard Reset</button>
+	</div>
+
+	<script>
+		let coins = 0, totalRolls = 0, bestChance = 0;
+    let lvs = { luck: 1, mut: 1, coin: 1, speed: 1 };
+    let baseMutDenominator = 5000; // HEAVY NERF FOR NORMAL
+    let luckMult = 1, coinMult = 1, speedMs = 1000, autoOn = false, timer = null, normalVault = null;
+    let normalUnlocks = { rarities: new Set(), muts: new Set() };
+    let inventoryNormal = {}, inventoryDev = {};
+
+    const rarities = [
+        { id: 'et', name: "ETERNAL", chance: 5000000, color: "#ffffff", cash: 500000 },
+        { id: 'ce', name: "CELESTIAL", chance: 1000000, color: "#ffffbc", cash: 100000 },
+        { id: 'di', name: "Divine", chance: 100000, color: "#2ac9d2", cash: 10000 },
+        { id: 'ex', name: "Exotic", chance: 25000, color: "#d26aca", cash: 2500 },
+        { id: 'my', name: "Mythic", chance: 5000, color: "#c53535", cash: 500 },
+        { id: 'le', name: "Legendary", chance: 1000, color: "#ffae00", cash: 100 },
+        { id: 'ep', name: "Epic", chance: 250, color: "#832ef7", cash: 40 },
+        { id: 'ra', name: "Rare", chance: 50, color: "#1e7fb7", cash: 15 },
+        { id: 'un', name: "Uncommon", chance: 10, color: "#36a90c", cash: 5 },
+        { id: 'co', name: "Common", chance: 2, color: "#aaaaaa", cash: 1 }
+    ];
+
+    const muts = [
+        { id: 'qt', name: "QUACKTASTIC", multi: 5000, color: "#ffff00", weight: 50 },
+        { id: 'vo', name: "VOID", multi: 250, color: "#4b0082", weight: 20 },
+        { id: 'gl', name: "GLITCHED", multi: 100, color: "#00ff00", weight: 10 },
+        { id: 'rd', name: "RADIANT", multi: 75, color: "#fffacd", weight: 8 },
+        { id: 'ne', name: "NEGATIVE", multi: 50, color: "#ff0000", weight: 6 },
+        { id: 'co', name: "CORRUPTED", multi: 40, color: "#5a5a5a", weight: 5 },
+        { id: 'gh', name: "GHOSTLY", multi: 25, color: "#e0ffff", weight: 4 },
+        { id: 'sh', name: "SHINY", multi: 10, color: "#ffff00", weight: 3 },
+        { id: 'fr', name: "FROSTED", multi: 5, color: "#add8e6", weight: 2 },
+        { id: 'cr', name: "CRACKED", multi: 2, color: "#8b4513", weight: 1 }
+    ];
+
+    // Aura
+    const canvas = document.getElementById('aura-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [], currentAuraColor = "#444";
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    class P {
+        constructor() { this.x = Math.random()*canvas.width; this.y = Math.random()*canvas.height; this.s = Math.random()*2+1; this.vx = Math.random()-0.5; this.vy = Math.random()-0.5; }
+        u() { this.x += this.vx; this.y += this.vy; if(this.x>canvas.width||this.x<0)this.vx*=-1; if(this.y>canvas.height||this.y<0)this.vy*=-1; }
+        d() { ctx.fillStyle = currentAuraColor; ctx.beginPath(); ctx.arc(this.x, this.y, this.s, 0, Math.PI*2); ctx.fill(); }
+    }
+    for(let i=0;i<40;i++) particles.push(new P());
+    function anim() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{p.u();p.d();}); requestAnimationFrame(anim); }
+    anim();
+
+    function roll() {
+        totalRolls++;
+        const isDev = document.getElementById('exit-dev').style.display === "inline-block";
+        const rng = Math.floor(Math.random() * 5000000) + 1;
+        let res = rarities[rarities.length - 1]; 
+        for (let r of rarities) { if (rng % Math.max(1, Math.floor(r.chance / luckMult)) === 0) { res = r; break; } }
+        
+        let activeStack = [], totalMutMulti = 1, dominantColor = res.color;
+        muts.forEach(m => {
+            let curOdds = isDev ? parseInt(document.getElementById('dev-slider').value) : Math.max(100, baseMutDenominator - (lvs.mut - 1) * 400);
+            let checkVal = Math.max(1, Math.floor(curOdds * m.weight));
+            if (Math.floor(Math.random() * checkVal) === 0) {
+                activeStack.push(m); totalMutMulti *= m.multi; dominantColor = m.color;
+                const mEl = document.getElementById(`idx-m-${m.id}`); if(mEl){mEl.classList.add('unlocked'); mEl.style.color=m.color;}
+                if(!isDev) normalUnlocks.muts.add(m.id);
+            }
+        });
+
+        const rEl = document.getElementById(`idx-r-${res.id}`); if(rEl){rEl.classList.add('unlocked'); rEl.style.color=res.color;}
+        if(!isDev) normalUnlocks.rarities.add(res.id);
+
+        let finalChance = res.chance * totalMutMulti;
+        coins += Math.floor(res.cash * totalMutMulti * coinMult);
+        const finalName = (activeStack.length > 0 ? activeStack.map(m => m.name).join(" ") + " " : "") + res.name;
+        currentAuraColor = dominantColor;
+
+        let targetInv = isDev ? inventoryDev : inventoryNormal;
+        if (!targetInv[finalName]) targetInv[finalName] = { count: 1, color: dominantColor, chance: finalChance }; else targetInv[finalName].count++;
+        
+        updateInventoryUI();
+        document.getElementById('rarity-label').innerText = `${finalName}\n(1/${finalChance.toLocaleString()})`;
+        document.getElementById('rarity-label').style.color = dominantColor;
+        document.getElementById('display').style.animation = activeStack.some(m => m.id === 'qt') ? "quackShake 0.1s infinite" : (activeStack.length >= 3 ? "rainbow 2s linear infinite" : "none");
+
+        if (finalChance > bestChance) {
+            bestChance = finalChance;
+            document.getElementById('rarest-best').innerText = `${finalName} (1/${finalChance.toLocaleString()})`;
+            document.getElementById('rarest-best').style.color = dominantColor;
+        }
+        updateUI(); if (totalRolls % 10 === 0 && !isDev) saveGame(); 
+    }
+
+    function checkDev(val) { if (val === "duck-rng-dev-123") { normalVault = { coins, totalRolls, bestChance, lvs: JSON.parse(JSON.stringify(lvs)), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color, inv: JSON.stringify(inventoryNormal) }; coins = 999999999; luckMult = 10000000; coinMult = 1000; speedMs = 50; document.getElementById('dev-controls').style.display = "block"; document.getElementById('exit-dev').style.display = "inline-block"; document.getElementById('dev-box').style.display = "none"; updateInventoryUI(); updateUI(); } }
+    
+    function exitDev() {
+        if (!normalVault) return;
+        coins = normalVault.coins; totalRolls = normalVault.totalRolls; bestChance = normalVault.bestChance; lvs = normalVault.lvs;
+        inventoryNormal = JSON.parse(normalVault.inv); inventoryDev = {};
+        document.getElementById('rarest-best').innerText = normalVault.bestText;
+        document.getElementById('rarest-best').style.color = normalVault.bestColor;
+        recalcStats();
+        document.getElementById('exit-dev').style.display = "none";
+        document.getElementById('dev-controls').style.display = "none";
+        document.getElementById('dev-box').style.display = "inline-block";
+        document.getElementById('dev-box').value = "";
+        restoreIndexUI(); updateInventoryUI(); updateUI();
+    }
+
+    function updateInventoryUI() {
+        const isDev = document.getElementById('exit-dev').style.display === "inline-block";
+        const targetInv = isDev ? inventoryDev : inventoryNormal;
+        const query = document.getElementById('inv-search').value.toLowerCase();
+        const sortedKeys = Object.keys(targetInv).sort((a, b) => targetInv[b].chance - targetInv[a].chance);
+        const filtered = sortedKeys.filter(n => n.toLowerCase().includes(query));
+        document.getElementById('bag-title').innerText = isDev ? "⚠️ DEV SATCHEL" : "Legit Backpack";
+        document.getElementById('inventory-grid').innerHTML = filtered.map(n => `<div class="inv-item" style="border-left-color:${targetInv[n].color}"><div class="inv-count">${targetInv[n].count}</div><strong>${n}</strong><br><small style="color:#666">1/${targetInv[n].chance.toLocaleString()}</small></div>`).join('');
+    }
+
+    function saveGame() { if(document.getElementById('exit-dev').style.display === "inline-block") return; const data = { coins, totalRolls, bestChance, lvs, inventoryNormal, unlockedR: Array.from(normalUnlocks.rarities), unlockedM: Array.from(normalUnlocks.muts), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color }; localStorage.setItem('duckRNG_Final_vRestored', JSON.stringify(data)); }
+    function loadGame() { const saved = JSON.parse(localStorage.getItem('duckRNG_Final_vRestored')); if (saved) { coins = saved.coins; totalRolls = saved.totalRolls; bestChance = saved.bestChance; lvs = saved.lvs; inventoryNormal = saved.inventoryNormal || {}; normalUnlocks.rarities = new Set(saved.unlockedR || []); normalUnlocks.muts = new Set(saved.unlockedM || []); document.getElementById('rarest-best').innerText = saved.bestText || "None"; document.getElementById('rarest-best').style.color = saved.bestColor || "gold"; restoreIndexUI(); updateInventoryUI(); recalcStats(); updateUI(); } }
+    function buyUpgrade(t) { let b = {luck:200, mut:500, coin:150, speed:1000}; let m = {luck:1.6, mut:1.8, coin:1.5, speed:3}; let c = Math.floor(b[t] * Math.pow(m[t], lvs[t]-1)); if (coins >= c) { coins -= c; lvs[t]++; recalcStats(); if(t === 'speed' && autoOn) {clearInterval(timer); timer = setInterval(roll, speedMs);} updateUI(); saveGame(); } }
+    function updateDevLuck(v) { document.getElementById('slider-val').innerText = `Mutation: 1 in ${v}`; }
+    function toggleAuto() { autoOn = !autoOn; const b = document.getElementById('auto-toggle'); b.innerText = autoOn ? "AUTO: ON" : "AUTO: OFF"; b.classList.toggle('auto-active', autoOn); if (autoOn) timer = setInterval(roll, speedMs); else clearInterval(timer); }
+    function recalcStats() { luckMult = 1 + (lvs.luck-1)*0.5; coinMult = 1 + (lvs.coin-1)*1.5; speedMs = 1000 - (lvs.speed-1)*200; }
+    function restoreIndexUI() { document.querySelectorAll('.index-item').forEach(el => { el.classList.remove('unlocked'); el.style.color = ""; }); normalUnlocks.rarities.forEach(id => { const el = document.getElementById(`idx-r-${id}`); const d = rarities.find(r => r.id === id); if(el && d) { el.classList.add('unlocked'); el.style.color = d.color; } }); normalUnlocks.muts.forEach(id => { const el = document.getElementById(`idx-m-${id}`); const d = muts.find(m => m.id === id); if(el && d) { el.classList.add('unlocked'); el.style.color = d.color; } }); }
+    function hardReset() { if(confirm("Hard Reset?")) { localStorage.clear(); location.reload(); } }
+    function updateUI() {
+        document.getElementById('coins').innerText = Math.floor(coins).toLocaleString();
+        document.getElementById('stat-rolls').innerText = totalRolls;
+        document.getElementById('stat-luck').innerText = luckMult.toFixed(1) + "x";
+        document.getElementById('stat-speed').innerText = (speedMs/1000).toFixed(1) + "s";
+        const shopTypes = [{t:'luck', n:'Luck', max:10}, {t:'mut', n:'Mutation', max:10}, {t:'coin', n:'Coins', max:10}, {t:'speed', n:'Speed', max:5}];
+        const container = document.getElementById('shop-items');
+        container.innerHTML = shopTypes.map(s => {
+            let b = {luck:200, mut:500, coin:150, speed:1000}; let m = {luck:1.6, mut:1.8, coin:1.5, speed:3};
+            let cost = Math.floor(b[s.t] * Math.pow(m[s.t], lvs[s.t]-1));
+            let isMax = lvs[s.t] >= s.max;
+            return `<div class="shop-item"><strong>${s.n}</strong><br>Lv: ${lvs[s.t]}/${s.max}<br><span class="price">${isMax?'MAX':cost.toLocaleString()}</span><button onclick="buyUpgrade('${s.t}')" ${isMax||coins<cost?'disabled' : ''}>Upgrade</button></div>`;
+        }).join('');
+    }
+    function initIndex() { document.getElementById('rarity-index').innerHTML = rarities.map(r => `<div id="idx-r-${r.id}" class="index-item">1/${r.chance.toLocaleString()}<br><b>${r.name}</b></div>`).join(''); document.getElementById('mutation-index').innerHTML = muts.map(m => `<div id="idx-m-${m.id}" class="index-item">x${m.multi.toLocaleString()}<br><b>${m.name}</b></div>`).join(''); }
+    window.onload = () => { initIndex(); loadGame(); updateUI(); };
+	</script>
+</body>
+
+</html>
