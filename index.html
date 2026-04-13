@@ -1,9 +1,8 @@
-
-V1.0<!DOCTYPE html>
+V1.1<!DOCTYPE html>
 <html>
 
 <head>
-	<title>Duck RNG! V1.0</title>
+	<title>Duck RNG! V1.1</title>
 	<style>
 		body {
 			font-family: 'Segoe UI', sans-serif;
@@ -219,39 +218,43 @@ V1.0<!DOCTYPE html>
 			width: fit-content;
 		}
 
+        .save-popup {
+            position: fixed;
+            top: 20px;
+            right: -250px;
+            background: #ffd700;
+            color: #000;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 9999;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+        .save-popup.show { right: 20px; }
+
 		@keyframes quackShake {
-			0% {
-				transform: scale(1.1);
-			}
-
-			50% {
-				transform: scale(1.15) rotate(-2deg);
-			}
-
-			100% {
-				transform: scale(1.1);
-			}
+			0% { transform: scale(1.1); }
+			50% { transform: scale(1.15) rotate(-2deg); }
+			100% { transform: scale(1.1); }
 		}
 
 		@keyframes rainbow {
-			0% {
-				filter: hue-rotate(0deg);
-			}
-
-			100% {
-				filter: hue-rotate(360deg);
-			}
+			0% { filter: hue-rotate(0deg); }
+			100% { filter: hue-rotate(360deg); }
 		}
 	</style>
 </head>
 
 <body>
+    <div id="save-toast" class="save-popup">💾 Game Saved!</div>
 	<canvas id="aura-canvas"></canvas>
 	<div class="currency">🪙 <span id="coins">0</span></div>
 	<div id="display" class="rarity-display"><span id="rarity-label">Ready?</span></div>
 
 	<div id="dev-controls">
-		<strong style="color: #ffd700;">GOD MODE SLIDER</strong><br>
+		<strong style="color: #ffd700;">GOD MODE</strong><br>
 		<input type="range" min="1" max="100" value="10" class="slider" id="dev-slider" oninput="updateDevLuck(this.value)">
 		<br><small id="slider-val">Mutation: 1 in 10</small>
 	</div>
@@ -259,13 +262,13 @@ V1.0<!DOCTYPE html>
 	<div style="margin-bottom: 20px;">
 		<button class="roll-btn" onclick="roll()">ROLL</button>
 		<button id="auto-toggle" class="auto-btn" onclick="toggleAuto()">AUTO: OFF</button>
-		<button onclick="saveGame()" style="width:auto; padding:15px; margin-left:10px; background:#222; border:1px solid #ffd700; color:#ffd700;">💾 SAVE</button>
+		<button onclick="saveGame(true)" style="width:auto; padding:15px; margin-left:10px; background:#222; border:1px solid #ffd700; color:#ffd700;">💾 SAVE</button>
 		<button id="exit-dev" style="display:none; width:auto; background:#444; border:1px solid red; color:red; margin-left:10px; padding:15px;" onclick="exitDev()">EXIT DEV MODE</button>
 	</div>
 
 	<div class="game-grid">
 		<div class="panel">
-			<h3 id="bag-title">Legit Backpack</h3>
+			<h3 id="bag-title">Inventory</h3>
 			<input type="text" id="inv-search" class="search-bar" placeholder="Search rolls..." oninput="updateInventoryUI()">
 			<div id="inventory-grid" class="inv-grid"></div>
 		</div>
@@ -292,15 +295,16 @@ V1.0<!DOCTYPE html>
 
 	<script>
 		let coins = 0, totalRolls = 0, bestChance = 0;
-    let lvs = { luck: 1, mut: 1, coin: 1, speed: 1 };
-    let baseMutDenominator = 5000; // HEAVY NERF FOR NORMAL
-    let luckMult = 1, coinMult = 1, speedMs = 1000, autoOn = false, timer = null, normalVault = null;
-    let normalUnlocks = { rarities: new Set(), muts: new Set() };
-    let inventoryNormal = {}, inventoryDev = {};
+        let lvs = { luck: 1, mut: 1, coin: 1, speed: 1 };
+        let baseMutDenominator = 5000;
+        let luckMult = 1, coinMult = 1, speedMs = 1000, autoOn = false, timer = null, normalVault = null;
+        let normalUnlocks = { rarities: new Set(), muts: new Set() };
+        let inventoryNormal = {}, inventoryDev = {};
 
     const rarities = [
         { id: 'et', name: "ETERNAL", chance: 5000000, color: "#ffffff", cash: 500000 },
         { id: 'ce', name: "CELESTIAL", chance: 1000000, color: "#ffffbc", cash: 100000 },
+        { id: 'ae', name: "Aetherial", chance: 500000, color: "#9cdbff", cash: 25000 },
         { id: 'di', name: "Divine", chance: 100000, color: "#2ac9d2", cash: 10000 },
         { id: 'ex', name: "Exotic", chance: 25000, color: "#d26aca", cash: 2500 },
         { id: 'my', name: "Mythic", chance: 5000, color: "#c53535", cash: 500 },
@@ -313,6 +317,7 @@ V1.0<!DOCTYPE html>
 
     const muts = [
         { id: 'qt', name: "QUACKTASTIC", multi: 5000, color: "#ffff00", weight: 50 },
+        { id: 'an', name: "ANCIENT", multi: 500, color: "#bda27e", weight: 25 },
         { id: 'vo', name: "VOID", multi: 250, color: "#4b0082", weight: 20 },
         { id: 'gl', name: "GLITCHED", multi: 100, color: "#00ff00", weight: 10 },
         { id: 'rd', name: "RADIANT", multi: 75, color: "#fffacd", weight: 8 },
@@ -324,7 +329,6 @@ V1.0<!DOCTYPE html>
         { id: 'cr', name: "CRACKED", multi: 2, color: "#8b4513", weight: 1 }
     ];
 
-    // Aura
     const canvas = document.getElementById('aura-canvas');
     const ctx = canvas.getContext('2d');
     let particles = [], currentAuraColor = "#444";
@@ -378,7 +382,7 @@ V1.0<!DOCTYPE html>
             document.getElementById('rarest-best').innerText = `${finalName} (1/${finalChance.toLocaleString()})`;
             document.getElementById('rarest-best').style.color = dominantColor;
         }
-        updateUI(); if (totalRolls % 10 === 0 && !isDev) saveGame(); 
+        updateUI(); if (totalRolls % 10 === 0 && !isDev) saveGame(false); 
     }
 
     function checkDev(val) { if (val === "duck-rng-dev-123") { normalVault = { coins, totalRolls, bestChance, lvs: JSON.parse(JSON.stringify(lvs)), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color, inv: JSON.stringify(inventoryNormal) }; coins = 999999999; luckMult = 10000000; coinMult = 1000; speedMs = 50; document.getElementById('dev-controls').style.display = "block"; document.getElementById('exit-dev').style.display = "inline-block"; document.getElementById('dev-box').style.display = "none"; updateInventoryUI(); updateUI(); } }
@@ -403,24 +407,42 @@ V1.0<!DOCTYPE html>
         const query = document.getElementById('inv-search').value.toLowerCase();
         const sortedKeys = Object.keys(targetInv).sort((a, b) => targetInv[b].chance - targetInv[a].chance);
         const filtered = sortedKeys.filter(n => n.toLowerCase().includes(query));
-        document.getElementById('bag-title').innerText = isDev ? "⚠️ DEV SATCHEL" : "Legit Backpack";
+        document.getElementById('bag-title').innerText = isDev ? "DEV SATCHEL" : "Inventory";
         document.getElementById('inventory-grid').innerHTML = filtered.map(n => `<div class="inv-item" style="border-left-color:${targetInv[n].color}"><div class="inv-count">${targetInv[n].count}</div><strong>${n}</strong><br><small style="color:#666">1/${targetInv[n].chance.toLocaleString()}</small></div>`).join('');
     }
 
-    function saveGame() { if(document.getElementById('exit-dev').style.display === "inline-block") return; const data = { coins, totalRolls, bestChance, lvs, inventoryNormal, unlockedR: Array.from(normalUnlocks.rarities), unlockedM: Array.from(normalUnlocks.muts), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color }; localStorage.setItem('duckRNG_Final_vRestored', JSON.stringify(data)); }
-    function loadGame() { const saved = JSON.parse(localStorage.getItem('duckRNG_Final_vRestored')); if (saved) { coins = saved.coins; totalRolls = saved.totalRolls; bestChance = saved.bestChance; lvs = saved.lvs; inventoryNormal = saved.inventoryNormal || {}; normalUnlocks.rarities = new Set(saved.unlockedR || []); normalUnlocks.muts = new Set(saved.unlockedM || []); document.getElementById('rarest-best').innerText = saved.bestText || "None"; document.getElementById('rarest-best').style.color = saved.bestColor || "gold"; restoreIndexUI(); updateInventoryUI(); recalcStats(); updateUI(); } }
-    function buyUpgrade(t) { let b = {luck:200, mut:500, coin:150, speed:1000}; let m = {luck:1.6, mut:1.8, coin:1.5, speed:3}; let c = Math.floor(b[t] * Math.pow(m[t], lvs[t]-1)); if (coins >= c) { coins -= c; lvs[t]++; recalcStats(); if(t === 'speed' && autoOn) {clearInterval(timer); timer = setInterval(roll, speedMs);} updateUI(); saveGame(); } }
+    function saveGame(manual = false) { 
+        if(document.getElementById('exit-dev').style.display === "inline-block") return; 
+        const data = { coins, totalRolls, bestChance, lvs, inventoryNormal, unlockedR: Array.from(normalUnlocks.rarities), unlockedM: Array.from(normalUnlocks.muts), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color }; 
+        localStorage.setItem('duckRNG_Final_v1.2', JSON.stringify(data)); 
+
+        if (manual) {
+            const toast = document.getElementById('save-toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    }
+
+    function loadGame() { 
+        const saved = JSON.parse(localStorage.getItem('duckRNG_Final_v1.2')); 
+        if (saved) { 
+            coins = saved.coins; totalRolls = saved.totalRolls; bestChance = saved.bestChance; lvs = saved.lvs; inventoryNormal = saved.inventoryNormal || {}; normalUnlocks.rarities = new Set(saved.unlockedR || []); normalUnlocks.muts = new Set(saved.unlockedM || []); document.getElementById('rarest-best').innerText = saved.bestText || "None"; document.getElementById('rarest-best').style.color = saved.bestColor || "gold"; restoreIndexUI(); updateInventoryUI(); recalcStats(); updateUI(); 
+        } 
+    }
+    function buyUpgrade(t) { let b = {luck:200, mut:500, coin:150, speed:1000}; let m = {luck:1.6, mut:1.8, coin:1.5, speed:3}; let c = Math.floor(b[t] * Math.pow(m[t], lvs[t]-1)); if (coins >= c) { coins -= c; lvs[t]++; recalcStats(); if(t === 'speed' && autoOn) {clearInterval(timer); timer = setInterval(roll, speedMs);} updateUI(); saveGame(false); } }
     function updateDevLuck(v) { document.getElementById('slider-val').innerText = `Mutation: 1 in ${v}`; }
     function toggleAuto() { autoOn = !autoOn; const b = document.getElementById('auto-toggle'); b.innerText = autoOn ? "AUTO: ON" : "AUTO: OFF"; b.classList.toggle('auto-active', autoOn); if (autoOn) timer = setInterval(roll, speedMs); else clearInterval(timer); }
     function recalcStats() { luckMult = 1 + (lvs.luck-1)*0.5; coinMult = 1 + (lvs.coin-1)*1.5; speedMs = 1000 - (lvs.speed-1)*200; }
     function restoreIndexUI() { document.querySelectorAll('.index-item').forEach(el => { el.classList.remove('unlocked'); el.style.color = ""; }); normalUnlocks.rarities.forEach(id => { const el = document.getElementById(`idx-r-${id}`); const d = rarities.find(r => r.id === id); if(el && d) { el.classList.add('unlocked'); el.style.color = d.color; } }); normalUnlocks.muts.forEach(id => { const el = document.getElementById(`idx-m-${id}`); const d = muts.find(m => m.id === id); if(el && d) { el.classList.add('unlocked'); el.style.color = d.color; } }); }
     function hardReset() { if(confirm("Hard Reset?")) { localStorage.clear(); location.reload(); } }
+    
     function updateUI() {
         document.getElementById('coins').innerText = Math.floor(coins).toLocaleString();
         document.getElementById('stat-rolls').innerText = totalRolls;
         document.getElementById('stat-luck').innerText = luckMult.toFixed(1) + "x";
         document.getElementById('stat-speed').innerText = (speedMs/1000).toFixed(1) + "s";
-        const shopTypes = [{t:'luck', n:'Luck', max:10}, {t:'mut', n:'Mutation', max:10}, {t:'coin', n:'Coins', max:10}, {t:'speed', n:'Speed', max:5}];
+
+        const shopTypes = [{t:'luck', n:'Luck', max:16}, {t:'mut', n:'Mutation', max:16}, {t:'coin', n:'Coins', max:10}, {t:'speed', n:'Speed', max:5}];
         const container = document.getElementById('shop-items');
         container.innerHTML = shopTypes.map(s => {
             let b = {luck:200, mut:500, coin:150, speed:1000}; let m = {luck:1.6, mut:1.8, coin:1.5, speed:3};
@@ -429,7 +451,11 @@ V1.0<!DOCTYPE html>
             return `<div class="shop-item"><strong>${s.n}</strong><br>Lv: ${lvs[s.t]}/${s.max}<br><span class="price">${isMax?'MAX':cost.toLocaleString()}</span><button onclick="buyUpgrade('${s.t}')" ${isMax||coins<cost?'disabled' : ''}>Upgrade</button></div>`;
         }).join('');
     }
-    function initIndex() { document.getElementById('rarity-index').innerHTML = rarities.map(r => `<div id="idx-r-${r.id}" class="index-item">1/${r.chance.toLocaleString()}<br><b>${r.name}</b></div>`).join(''); document.getElementById('mutation-index').innerHTML = muts.map(m => `<div id="idx-m-${m.id}" class="index-item">x${m.multi.toLocaleString()}<br><b>${m.name}</b></div>`).join(''); }
+
+    function initIndex() { 
+        document.getElementById('rarity-index').innerHTML = rarities.map(r => `<div id="idx-r-${r.id}" class="index-item">1/${r.chance.toLocaleString()}<br><b>${r.name}</b></div>`).join(''); 
+        document.getElementById('mutation-index').innerHTML = muts.map(m => `<div id="idx-m-${m.id}" class="index-item">x${m.multi.toLocaleString()}<br><b>${m.name}</b></div>`).join(''); 
+    }
     window.onload = () => { initIndex(); loadGame(); updateUI(); };
 	</script>
 </body>
