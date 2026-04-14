@@ -355,7 +355,7 @@ V1.1<!DOCTYPE html>
     ];
 
     const secretMuts = [
-        { id: 'jbz', name: "JinBin Zahooey", multi: 1000, color: "#36454f", weight: 100000 }
+        { id: 'jbz', name: "JinBin Zahooey", multi: 10000, color: "#36454f", weight: 100000 }
     ];
 
     const canvas = document.getElementById('aura-canvas');
@@ -426,7 +426,7 @@ V1.1<!DOCTYPE html>
             const bestEl = document.getElementById('rarest-best');
             bestEl.innerText = `${finalName} (1/${finalChance.toLocaleString()})`;
             bestEl.style.color = dominantColor;
-            bestEl.className = isSecret ? (isSecret ? "zahooey-outline" : "") : "";
+            bestEl.className = isSecret ? "zahooey-outline" : "";
         }
         updateUI(); if (totalRolls % 10 === 0 && !isDev) saveGame(false); 
     }
