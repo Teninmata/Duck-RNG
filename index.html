@@ -2,7 +2,7 @@ V1.1<!DOCTYPE html>
 <html>
 
 <head>
-	<title>Duck RNG! V1.1</title>
+	<title>Duck RNG! Halloween</title>
 	<style>
 		body {
 			font-family: 'Segoe UI', sans-serif;
@@ -14,6 +14,12 @@ V1.1<!DOCTYPE html>
 			margin: 0;
 		}
 
+        .halloween-banner { max-width:900px; margin:0 auto 18px; padding:14px; border:1px solid #a65b20; border-radius:12px; background:linear-gradient(100deg,#31153e,#582b16); color:#ffe0b0; position:relative; z-index:10; box-shadow:0 0 22px #ff7a1820; }
+        .halloween-banner strong { color:#ff9b35; font-size:1.2rem; }
+        .halloween-candy { color:#ff91d5; font-weight:800; margin-left:12px; }
+        .halloween-shop { border:1px solid #7d4a25; background:rgba(54,29,18,.8); border-radius:10px; padding:15px; margin-top:12px; }
+        .halloween-shop h3 { color:#ff9b35; margin-top:0; }
+        .halloween-shop .shop-item { border-color:#704326; }
 		.currency {
 			font-size: 2rem;
 			color: #ffd700;
@@ -245,24 +251,30 @@ V1.1<!DOCTYPE html>
 			0% { filter: hue-rotate(0deg); }
 			100% { filter: hue-rotate(360deg); }
 		}
-	</style>
+	
+    .codes-panel { text-align:center; }
+    .codes-panel .search-bar { box-sizing:border-box; width:100%; text-align:center; }
+    .codes-panel button { width:auto; padding:10px 18px; }
+</style>
 </head>
 
 <body>
     <div id="save-toast" class="save-popup">💾 Game Saved!</div>
+    <div class="halloween-banner"><strong>🎃 DUCK RNG: HALLOWEEN EVENT 🎃</strong><br><span>Spooky mutations are in the roll pool! Earn Candy 🍬 from every roll and spend it on event boosts.</span></div>
 	<canvas id="aura-canvas"></canvas>
-	<div class="currency">🪙 <span id="coins">0</span></div>
+	<div class="currency">🪙 <span id="coins">0</span><span class="halloween-candy">🍬 <span id="halloween-candy">0</span></span></div>
 	<div id="display" class="rarity-display"><span id="rarity-label">Ready?</span></div>
 
 	<div id="dev-controls">
 		<strong style="color: #ffd700;">GOD MODE</strong><br>
 		<input type="range" min="1" max="100" value="10" class="slider" id="dev-slider" oninput="updateDevLuck(this.value)">
-		<br><small id="slider-val">Mutation: 1 in 10</small>
+<br><small id="slider-val">Mutation: 1 in 10</small>
 	</div>
 
 	<div style="margin-bottom: 20px;">
 		<button class="roll-btn" onclick="roll()">ROLL</button>
 		<button id="auto-toggle" class="auto-btn" onclick="toggleAuto()">AUTO: OFF</button>
+
 		<button onclick="saveGame(true)" style="width:auto; padding:15px; margin-left:10px; background:#222; border:1px solid #ffd700; color:#ffd700;">💾 SAVE</button>
 		<button id="exit-dev" style="display:none; width:auto; background:#444; border:1px solid red; color:red; margin-left:10px; padding:15px;" onclick="exitDev()">EXIT DEV MODE</button>
 	</div>
@@ -291,10 +303,15 @@ V1.1<!DOCTYPE html>
                 </div>
             </div>
             <p id="event-status" style="color:#00ffcc; font-weight:bold; margin-top:10px;"></p>
+            <div class="halloween-shop">
+              <h3>🎃 Halloween Candy Shop</h3>
+              <p style="color:#cbb9d4;font-size:.9rem">Candy is earned automatically when you roll. These event upgrades are saved with your game.</p>
+              <div id="halloween-shop-items"></div>
+            </div>
 		</div>
 		<div class="panel">
 			<h3>Index</h3>
-			<div id="rarity-index" class="index-grid"></div>
+            <div id="rarity-index" class="index-grid"></div>
 			<hr style="border:0;border-top:1px solid #333;margin:15px 0;">
 			<div id="mutation-index" class="index-grid"></div>
 		</div>
@@ -305,7 +322,12 @@ V1.1<!DOCTYPE html>
 			<span id="stat-luck" style="color:#00ffcc">1.0x</span> | Speed:
 			<span id="stat-speed" style="color:#00ffcc">1.0s</span></p>
 		<p>Rarest Roll: <span id="rarest-best" style="color:gold; font-weight:bold;">None</span></p>
-		<input type="password" id="dev-box" style="background:#000;border:1px solid #333;color:#444;padding:5px;font-size:0.7rem;" placeholder="Key..." oninput="checkDev(this.value)">
+		<div id="key-code-entry" style="margin:10px auto; max-width:360px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+            <input type="text" id="dev-box" style="background:#000;border:1px solid #a66bff;color:#fff;padding:8px;font-size:0.85rem;max-width:220px;" placeholder="Dev key or code..." autocomplete="off" maxlength="40" onkeydown="if(event.key==='Enter'){event.preventDefault();submitKeyOrCode();}">
+            <button class="auto-btn" type="button" onclick="submitKeyOrCode()" style="width:auto;padding:7px 10px;">Enter</button>
+        </div>
+        <p id="code-message" role="status" style="font-weight:bold;min-height:1.2em;margin:4px 0 10px;"></p>
+
 		<br><button onclick="hardReset()" style="width:auto; margin-top:20px; font-size:0.7rem; color:#555; background:transparent; border:none; cursor:pointer;">Hard Reset</button>
 	</div>
 
@@ -318,8 +340,15 @@ V1.1<!DOCTYPE html>
         let inventoryNormal = {}, inventoryDev = {};
         
         let eventLuckMult = 1, eventTimer = 0, eventInterval = null;
+        let halloweenCandy = 0;
+        let halloweenUpgrades = [];
+        
+        let redeemedCodes = [];
+        let codeLuckUntil = 0;
+        let codeLuckTimer = null;
 
     const rarities = [
+        { id: 'px', name: "PUMPKIN", chance: 10000000, color: "#ff7b22", cash: 1000000, exclusive: true },
         { id: 'et', name: "ETERNAL", chance: 5000000, color: "#ffffff", cash: 500000 },
         { id: 'ce', name: "CELESTIAL", chance: 1000000, color: "#ffffbc", cash: 100000 },
         { id: 'ae', name: "Aetherial", chance: 500000, color: "#9cdbff", cash: 25000 },
@@ -345,7 +374,12 @@ V1.1<!DOCTYPE html>
         { id: 'gh', name: "GHOSTLY", multi: 25, color: "#e0ffff", weight: 4 },
         { id: 'sh', name: "SHINY", multi: 10, color: "#ffff00", weight: 3 },
         { id: 'fr', name: "FROSTED", multi: 5, color: "#add8e6", weight: 2 },
-        { id: 'cr', name: "CRACKED", multi: 2, color: "#8b4513", weight: 1 }
+        { id: 'cr', name: "CRACKED", multi: 2, color: "#8b4513", weight: 1 },
+        { id: 'cc', name: "CANDY CORN", multi: 15, color: "#ffb52e", weight: 2, halloween: true },
+        { id: 'ha', name: "HAUNTED", multi: 40, color: "#a66bff", weight: 1, halloween: true },
+        { id: 'sp', name: "SPOOKY", multi: 100, color: "#ff78c8", weight: 2, halloween: true },
+        { id: 'hh', name: "HEADLESS HORSEMAN", multi: 150, color: "#ff6238", weight: 1, halloween: true },
+        { id: 'ip', name: "PUMPKIN", multi: 500, color: "#ff3b12", weight: 1, halloween: true }
     ];
 
     const canvas = document.getElementById('aura-canvas');
@@ -367,7 +401,7 @@ V1.1<!DOCTYPE html>
         const isDev = document.getElementById('exit-dev').style.display === "inline-block";
         const rng = Math.floor(Math.random() * 5000000) + 1;
         let res = rarities[rarities.length - 1]; 
-        for (let r of rarities) { if (rng % Math.max(1, Math.floor(r.chance / luckMult)) === 0) { res = r; break; } }
+        for (let r of rarities) { if (!r.exclusive && rng % Math.max(1, Math.floor(r.chance / luckMult)) === 0) { res = r; break; } }
         
         let activeStack = [], totalMutMulti = 1, dominantColor = res.color;
         muts.forEach(m => {
@@ -384,6 +418,9 @@ V1.1<!DOCTYPE html>
         if(!isDev) normalUnlocks.rarities.add(res.id);
 
         let finalChance = res.chance * totalMutMulti;
+        const halloweenHit = activeStack.some(m => m.halloween);
+        halloweenCandy += halloweenHit ? 5 : 1;
+        if (halloweenUpgrades.includes("candy-pouch")) halloweenCandy += 2;
         coins += Math.floor(res.cash * totalMutMulti * coinMult);
         const finalName = (activeStack.length > 0 ? activeStack.map(m => m.name).join(" ") + " " : "") + res.name;
         currentAuraColor = dominantColor;
@@ -434,6 +471,11 @@ V1.1<!DOCTYPE html>
         inventoryNormal = JSON.parse(normalVault.inv); inventoryDev = {};
         document.getElementById('rarest-best').innerText = normalVault.bestText;
         document.getElementById('rarest-best').style.color = normalVault.bestColor;
+        
+        document.getElementById('code-message').innerText = "";
+        document.getElementById('rarity-label').innerText = "Ready?";
+        document.getElementById('rarity-label').style.color = "#ffffff";
+        
         recalcStats();
         document.getElementById('exit-dev').style.display = "none";
         document.getElementById('dev-controls').style.display = "none";
@@ -454,7 +496,7 @@ V1.1<!DOCTYPE html>
 
     function saveGame(manual = false) { 
         if(document.getElementById('exit-dev').style.display === "inline-block") return; 
-        const data = { coins, totalRolls, bestChance, lvs, inventoryNormal, unlockedR: Array.from(normalUnlocks.rarities), unlockedM: Array.from(normalUnlocks.muts), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color }; 
+        const data = { coins, totalRolls, bestChance, lvs, inventoryNormal, unlockedR: Array.from(normalUnlocks.rarities), unlockedM: Array.from(normalUnlocks.muts), bestText: document.getElementById('rarest-best').innerText, bestColor: document.getElementById('rarest-best').style.color, halloweenCandy, halloweenUpgrades, redeemedCodes, codeLuckUntil }; 
         localStorage.setItem('duckRNG_Final_v1.2', JSON.stringify(data)); 
 
         if (manual) {
@@ -467,7 +509,13 @@ V1.1<!DOCTYPE html>
     function loadGame() { 
         const saved = JSON.parse(localStorage.getItem('duckRNG_Final_v1.2')); 
         if (saved) { 
-            coins = saved.coins; totalRolls = saved.totalRolls; bestChance = saved.bestChance; lvs = saved.lvs; inventoryNormal = saved.inventoryNormal || {}; normalUnlocks.rarities = new Set(saved.unlockedR || []); normalUnlocks.muts = new Set(saved.unlockedM || []); document.getElementById('rarest-best').innerText = saved.bestText || "None"; document.getElementById('rarest-best').style.color = saved.bestColor || "gold"; restoreIndexUI(); updateInventoryUI(); recalcStats(); updateUI(); 
+            coins = saved.coins || 0; totalRolls = saved.totalRolls || 0; bestChance = saved.bestChance || 0; lvs = saved.lvs || { luck: 1, mut: 1, coin: 1, speed: 1 }; halloweenCandy = saved.halloweenCandy || 0; halloweenUpgrades = saved.halloweenUpgrades || []; redeemedCodes = saved.redeemedCodes || []; codeLuckUntil = saved.codeLuckUntil || 0; inventoryNormal = saved.inventoryNormal || {}; normalUnlocks.rarities = new Set(saved.unlockedR || []); normalUnlocks.muts = new Set(saved.unlockedM || []); document.getElementById('rarest-best').innerText = saved.bestText || "None"; document.getElementById('rarest-best').style.color = saved.bestColor || "gold"; 
+            
+            if(document.getElementById('rarest-best').innerText.includes("PUMPKIN") && bestChance === 0) {
+                 document.getElementById('rarest-best').innerText = "None";
+                 document.getElementById('rarest-best').style.color = "gold";
+            }
+            restoreIndexUI(); updateInventoryUI(); recalcStats(); updateUI(); 
         } 
     }
 
@@ -489,7 +537,7 @@ V1.1<!DOCTYPE html>
     function toggleAuto() { autoOn = !autoOn; const b = document.getElementById('auto-toggle'); b.innerText = autoOn ? "AUTO: ON" : "AUTO: OFF"; b.classList.toggle('auto-active', autoOn); if (autoOn) timer = setInterval(roll, speedMs); else clearInterval(timer); }
     
     function recalcStats() { 
-        luckMult = (1 + (lvs.luck-1)*0.5) * eventLuckMult; 
+        luckMult = (1 + (lvs.luck-1)*0.5) * eventLuckMult * (codeLuckUntil > Date.now() ? 2 : 1); 
         coinMult = 1 + (lvs.coin-1)*1.5; 
         speedMs = 1000 - (lvs.speed-1)*200; 
     }
@@ -500,10 +548,11 @@ V1.1<!DOCTYPE html>
         normalUnlocks.muts.forEach(id => { const el = document.getElementById(`idx-m-${id}`); const d = muts.find(m => m.id === id); if(el && d) { el.classList.add('unlocked'); el.style.color = d.color; } }); 
     }
 
-    function hardReset() { if(confirm("Hard Reset?")) { localStorage.clear(); location.reload(); } }
+    function hardReset() { if(confirm("Hard Reset?")) { localStorage.removeItem("duckRNG_Final_v1.2"); location.reload(); } }
     
     function updateUI() {
         document.getElementById('coins').innerText = Math.floor(coins).toLocaleString();
+        document.getElementById('halloween-candy').innerText = Math.floor(halloweenCandy).toLocaleString();
         document.getElementById('stat-rolls').innerText = totalRolls;
         document.getElementById('stat-luck').innerText = luckMult.toFixed(1) + "x";
         document.getElementById('stat-speed').innerText = (speedMs/1000).toFixed(1) + "s";
@@ -524,13 +573,137 @@ V1.1<!DOCTYPE html>
         
         document.getElementById('event-5x-btn').disabled = coins < 5000000;
         document.getElementById('event-10x-btn').disabled = coins < 10000000;
+        renderHalloweenShop();
+    }
+
+    const halloweenShop = [
+      {id:"pumpkin-luck", name:"🎃 Pumpkin Charm", desc:"+25% permanent luck", cost:75, kind:"luck", repeatable: false},
+      {id:"witch-brew", name:"🧪 Witch's Brew", desc:"Earn 2x coins for 10 rolls (permanent +0.5 coin multiplier)", cost:150, kind:"coin", repeatable: false},
+      {id:"candy-pouch", name:"🍬 Trick-or-Treat Bag", desc:"Earn +2 Candy every roll", cost:250, kind:"candy", repeatable: false},
+      {id:"spooky-elixir", name:"🧪 Luck Elixir", desc:"+5x Luck for 5 minutes (Reusable)", cost:3000, kind:"elixir", repeatable: true}
+    ];
+    function renderHalloweenShop() {
+      const container = document.getElementById('halloween-shop-items');
+      if (!container) return;
+      container.innerHTML = halloweenShop.map(item => {
+        const owned = !item.repeatable && halloweenUpgrades.includes(item.id);
+        return `<div class="shop-item"><strong>${item.name}</strong><br><small>${item.desc}</small><br><span class="price">${owned ? "OWNED" : item.cost.toLocaleString()+" 🍬"}</span><button ${owned || halloweenCandy < item.cost ? "disabled" : ""} onclick="buyHalloweenUpgrade('${item.id}')">${owned ? "Owned" : "Buy"}</button></div>`;
+      }).join('');
+    }
+    function buyHalloweenUpgrade(id) {
+      const item = halloweenShop.find(x => x.id === id);
+      if (!item || (!item.repeatable && halloweenUpgrades.includes(id)) || halloweenCandy < item.cost) return;
+      halloweenCandy -= item.cost;
+      
+      if (!item.repeatable) {
+        halloweenUpgrades.push(id);
+        if (item.kind === "luck") { lvs.luck = Math.min(20, lvs.luck + 1); recalcStats(); }
+        if (item.kind === "coin") { lvs.coin = Math.min(12, lvs.coin + 1); recalcStats(); }
+      } else {
+        if (item.kind === "elixir") {
+            codeLuckUntil = Math.max(codeLuckUntil, Date.now()) + 5 * 60 * 1000; 
+            startCodeLuckTimer();
+            const message = document.getElementById('code-message');
+            if (message) {
+                message.style.color = '#75ff9b';
+                message.textContent = '+5x Luck activated for 5 minutes! 🧪';
+            }
+        }
+      }
+      updateUI();
+      saveGame(false);
+    }
+
+    function toggleCodesPanel() {
+        const input = document.getElementById('dev-box');
+        if (input) input.focus();
+    }
+
+    function submitKeyOrCode() {
+        const input = document.getElementById('dev-box');
+        const value = input.value.trim();
+        if (!value) {
+            const message = document.getElementById('code-message');
+            message.style.color = '#ff7777';
+            message.textContent = 'Enter codes here...';
+            input.focus();
+            return;
+        }
+        if (value === 'duck-rng-dev-123') {
+            checkDev(value);
+            return;
+        }
+        redeemCode(value);
+    }
+
+    function startCodeLuckTimer() {
+        if (codeLuckTimer) clearInterval(codeLuckTimer);
+        const refresh = () => {
+            if (codeLuckUntil <= Date.now()) {
+                codeLuckUntil = 0;
+                if (codeLuckTimer) clearInterval(codeLuckTimer);
+                codeLuckTimer = null;
+            }
+            recalcStats();
+            updateUI();
+        };
+        if (codeLuckUntil > Date.now()) codeLuckTimer = setInterval(refresh, 1000);
+        refresh();
+    }
+
+    function redeemCode(codeValue) {
+        const input = document.getElementById('dev-box');
+        const message = document.getElementById('code-message');
+        const code = String(codeValue === undefined ? input.value : codeValue).trim().toUpperCase();
+        const rewards = {
+            CONZ: { description: '5,000 coins', apply: () => { coins += 5000; } },
+            MORCONZ: { description: '10,000 coins', apply: () => { coins += 10000; } },
+            LUCKY: { description: '2x luck for 5 minutes', apply: () => { codeLuckUntil = Math.max(codeLuckUntil, Date.now()) + 5 * 60 * 1000; startCodeLuckTimer(); } },
+            HALLOWEEN: { description: '100 Halloween Candy', apply: () => { halloweenCandy += 100; } },
+            SPOOKY: { description: '250 Halloween Candy', apply: () => { halloweenCandy += 250; } },
+            PUMPKIN: { description: 'the exclusive PUMPKIN rarity', apply: () => {
+                const rarity = rarities.find(r => r.id === 'px');
+                if (!rarity) return;
+                normalUnlocks.rarities.add(rarity.id);
+                const itemName = rarity.name;
+                if (!inventoryNormal[itemName]) inventoryNormal[itemName] = { count: 1, color: rarity.color, chance: rarity.chance };
+                else inventoryNormal[itemName].count++;
+                const indexItem = document.getElementById(`idx-r-${rarity.id}`);
+                if (indexItem) { indexItem.classList.add('unlocked'); indexItem.style.color = rarity.color; }
+            } }
+        };
+
+        if (!code) {
+            message.style.color = '#ff7777';
+            message.textContent = 'Enter a code first!';
+            return;
+        }
+        if (!rewards[code]) {
+            message.style.color = '#ff7777';
+            message.textContent = 'Invalid code!';
+            return;
+        }
+        if (redeemedCodes.includes(code)) {
+            message.style.color = '#ff7777';
+            message.textContent = 'You already redeemed this code!';
+            return;
+        }
+
+        rewards[code].apply();
+        redeemedCodes.push(code);
+        message.style.color = '#75ff9b';
+        message.textContent = `Success! You received ${rewards[code].description}.`;
+        input.value = '';
+        updateInventoryUI();
+        updateUI();
+        saveGame(false);
     }
 
     function initIndex() { 
-        document.getElementById('rarity-index').innerHTML = rarities.map(r => `<div id="idx-r-${r.id}" class="index-item">1/${r.chance.toLocaleString()}<br><b>${r.name}</b></div>`).join(''); 
-        document.getElementById('mutation-index').innerHTML = muts.map(m => `<div id="idx-m-${m.id}" class="index-item">x${m.multi.toLocaleString()}<br><b>${m.name}</b></div>`).join(''); 
+        document.getElementById('rarity-index').innerHTML = rarities.map(r => `<div id="idx-r-${r.id}" class="index-item">${r.exclusive ? 'EXCLUSIVE' : '1/'+r.chance.toLocaleString()}<br><b>${r.name}</b></div>`).join(''); 
+        document.getElementById('mutation-index').innerHTML = muts.map(m => `<div id="idx-m-${m.id}" class="index-item" style="${m.halloween ? 'border-color:#8b4c23;background:#26170f' : ''}">x${m.multi.toLocaleString()}<br><b>${m.halloween ? '🎃 ' : ''}${m.name}</b></div>`).join(''); 
     }
-    window.onload = () => { initIndex(); loadGame(); updateUI(); };
+    window.onload = () => { initIndex(); loadGame(); restoreIndexUI(); startCodeLuckTimer(); updateUI(); };
 	</script>
 </body>
 
