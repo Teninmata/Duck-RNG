@@ -4,17 +4,13 @@ This is one of my games called "Duck RNG!"
 🎃New Halloween Update Is Here!🎃
 
 
-
 *New exclusive rarity
-
 
 
 *New Halloween mutations
 
 
-
 *Codes
-
 
 
 *And more!
